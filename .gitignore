@@ -3,3 +3,4 @@
 /.DONE
 /.CANCEL_SHUTDOWN
 /watchdog.log
+/watchdog.py
