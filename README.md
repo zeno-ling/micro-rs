@@ -182,8 +182,8 @@ fn onSave(ev) {
 
 ## 发布脚本
 
-- Windows：`scripts/release.ps1 -Version v0.1.2`，参数 `-SkipBuild` 跳过编译、`-NoUpload` 只打包不上传。
-- Linux / macOS：`bash scripts/release.sh -v v0.1.2 -s`（`-s` 只打包不上传）；交叉编译示例：`bash scripts/release.sh -v v0.1.2 -s -t x86_64-apple-darwin -a x64`。
+- Windows：`scripts/release.ps1 -Version v0.1.3`，参数 `-SkipBuild` 跳过编译、`-NoUpload` 只打包不上传。
+- Linux / macOS：`bash scripts/release.sh -v v0.1.3 -s`（`-s` 只打包不上传）；交叉编译示例：`bash scripts/release.sh -v v0.1.3 -s -t x86_64-apple-darwin -a x64`。
 
 ## 许可
 
