@@ -55,21 +55,43 @@ fn draw_pane(frame: &mut Frame, area: Rect, ed: &Editor, pane: &crate::editor::P
     let top = pane.top;
     let height = area.height as usize;
     let gutter_w = if ed.config.line_numbers { 5 } else { 0 };
+    // Tree-sitter parses the whole document, so highlight from the full text.
+    let full_text = buf.rope.to_string();
+    let folds: Vec<crate::syntax::Fold> = ed.highlighter.as_ref()
+        .map(|h| h.folds(&full_text, &ed.config.theme))
+        .unwrap_or_default();
+    // Rows hidden by a collapsed fold (excluding the fold's first line).
+    let mut hidden: Vec<bool> = vec![false; buf.line_count()];
+    for row in &ed.folded {
+        if let Some(f) = folds.iter().find(|f| f.start == *row) {
+            for r in f.start + 1..=f.end {
+                if let Some(slot) = hidden.get_mut(r) { *slot = true; }
+            }
+        }
+    }
     let mut lines: Vec<Line> = Vec::new();
-    for i in 0..height {
+    let mut i = 0usize;
+    while i < height && lines.len() < height {
         let idx = top + i;
         if idx >= buf.line_count() { break; }
-        let content = buf.line(idx);
+        i += 1;
+        if hidden.get(idx).copied().unwrap_or(false) { continue; }
         let mut spans: Vec<Span> = Vec::new();
         if ed.config.line_numbers {
             spans.push(Span::styled(format!("{:>4} ", idx + 1), Style::default().fg(Color::DarkGray)));
+        }
+        // Fold affordance: a ▸/▾ marker in the gutter area.
+        let is_fold = folds.iter().any(|f| f.start == idx);
+        if is_fold {
+            let marker = if ed.folded.contains(&idx) { "▾ " } else { "▸ " };
+            spans.push(Span::styled(marker, Style::default().fg(Color::Yellow)));
         }
         let sel = buf.sel_anchor;
         let in_sel = if let Some(anchor) = sel {
             let (a, b) = (anchor.line.min(buf.cursor.line), anchor.line.max(buf.cursor.line));
             idx >= a && idx <= b
         } else { false };
-        for sp in syntax_spans(ed, &content) {
+        for sp in syntax_spans(ed, idx, &full_text) {
             if in_sel { spans.push(sp.patch_style(Style::default().bg(Color::Indexed(236)))); }
             else { spans.push(sp); }
         }
@@ -88,15 +110,16 @@ fn draw_pane(frame: &mut Frame, area: Rect, ed: &Editor, pane: &crate::editor::P
     }
 }
 
-fn syntax_spans(ed: &Editor, content: &str) -> Vec<Span<'static>> {
+fn syntax_spans(ed: &Editor, line: usize, full_text: &str) -> Vec<Span<'static>> {
     if let Some(syn) = &ed.highlighter {
-        let regions = syn.highlight(content, &ed.config.theme);
+        let regions = syn.spans_for_line(line, full_text, &ed.config.theme);
         if !regions.is_empty() {
             return regions.into_iter().map(|(rgb, t)| {
                 Span::styled(t, Style::default().fg(Color::Rgb(rgb[0], rgb[1], rgb[2])))
             }).collect();
         }
     }
+    let content = full_text.lines().nth(line).unwrap_or("");
     vec![Span::raw(content.to_string())]
 }
 

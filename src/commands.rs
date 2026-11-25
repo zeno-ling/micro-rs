@@ -47,6 +47,10 @@ pub enum Command {
     ListPlugins,
     /// Print every registered key binding to the status bar.
     ListKeybindings,
+    /// Toggle folding of the region at the cursor.
+    ToggleFold,
+    /// Expand every folded region.
+    UnfoldAll,
     None,
 }
 
@@ -90,6 +94,9 @@ pub fn default_keymap() -> std::collections::HashMap<(KeyCode, KeyModifiers), Co
     m.insert((Enter, KeyModifiers::NONE), Command::Newline);
     m.insert((Tab, KeyModifiers::NONE), Command::Tab);
     m.insert((Esc, KeyModifiers::NONE), Command::Cancel);
+    m.insert((F(2), KeyModifiers::NONE), Command::ToggleTheme);
+    m.insert((F(3), KeyModifiers::NONE), Command::ToggleFold);
+    m.insert((F(4), KeyModifiers::NONE), Command::UnfoldAll);
     m
 }
 
@@ -230,6 +237,8 @@ pub fn parse_command(s: &str) -> Option<Command> {
         "reloadplugins" => Command::ReloadPlugins,
         "listplugins" => Command::ListPlugins,
         "listkeybindings" => Command::ListKeybindings,
+        "togglefold" | "fold" => Command::ToggleFold,
+        "unfoldall" => Command::UnfoldAll,
         "help" => Command::Help,
         "cancel" => Command::Cancel,
         "confirm" => Command::Confirm,

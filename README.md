@@ -11,7 +11,8 @@
 - 撤销 / 重做（内存操作栈）
 - 多光标（Alt-P / Alt-N 上下添加）
 - 水平 / 垂直分屏与多标签页
-- 语法高亮（syntect 内置语法 / 主题，可切换主题）
+- 语法高亮（tree-sitter 解析，参照 Helix 的语义分桶上色，13 种语言，可切换主题）
+- 代码折叠（基于 tree-sitter AST 的多行节点范围，F3 折叠 / F4 全部展开）
 - nano 风格底部菜单栏 + 状态栏
 - 查找 / 替换，支持区分大小写与正则
 - 系统剪贴板（不可用自动回退内部剪贴板）
@@ -77,6 +78,8 @@ echo hello | micro-rs   # 从 stdin 读入
 | Ctrl+↑ / Ctrl+↓ | 文件首 / 文件尾 |
 | 方向键 / Home / End | 移动光标 |
 | F2 | 切换主题 |
+| F3 | 折叠 / 展开光标处代码块 |
+| F4 | 展开所有折叠 |
 
 底栏菜单可用方向键左右切换、回车执行命令、Esc 关闭。
 
@@ -182,8 +185,8 @@ fn onSave(ev) {
 
 ## 发布脚本
 
-- Windows：`scripts/release.ps1 -Version v0.1.3`，参数 `-SkipBuild` 跳过编译、`-NoUpload` 只打包不上传。
-- Linux / macOS：`bash scripts/release.sh -v v0.1.3 -s`（`-s` 只打包不上传）；交叉编译示例：`bash scripts/release.sh -v v0.1.3 -s -t x86_64-apple-darwin -a x64`。
+- Windows：`scripts/release.ps1 -Version v0.1.4`，参数 `-SkipBuild` 跳过编译、`-NoUpload` 只打包不上传。
+- Linux / macOS：`bash scripts/release.sh -v v0.1.4 -s`（`-s` 只打包不上传）；交叉编译示例：`bash scripts/release.sh -v v0.1.4 -s -t x86_64-apple-darwin -a x64`。
 
 ## 许可
 

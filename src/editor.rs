@@ -53,6 +53,8 @@ pub struct Editor {
     pub focus: Focus,
     pub prompt: Option<Prompt>,
     pub status_message: String,
+    /// Rows whose fold region is currently collapsed (zero-based).
+    pub folded: Vec<usize>,
     pub menu_open: Option<usize>,
     pub menus: Vec<(&'static str, Vec<(&'static str, &'static str)>)>,
     pub quit: bool,
@@ -172,6 +174,7 @@ impl Editor {
             } else {
                 "Ready".into()
             },
+            folded: Vec::new(),
             menu_open: None,
             menus,
             quit: false,
@@ -365,7 +368,7 @@ impl Editor {
             7 => self.execute(Command::Replace),
             9 => self.cycle_theme(),
             10 => self.execute(Command::SplitVertical),
-            12 => { self.status_message = "micro-rs 0.1.3 — Rust terminal editor".into(); }
+            12 => { self.status_message = "micro-rs 0.1.4 — Rust terminal editor".into(); }
             _ => {}
         }
     }
@@ -517,6 +520,38 @@ impl Editor {
         }
     }
 
+    /// Toggle folding at the cursor's row, matching Helix's fold-at-cursor
+    /// behaviour backed by tree-sitter node ranges.
+    fn toggle_fold(&mut self) {
+        let row = self.pane().buf.cursor.line;
+        let full_text = self.pane().buf.rope.to_string();
+        let theme = self.config.theme.clone();
+        let fold = self.highlighter.as_ref()
+            .and_then(|h| h.fold_at(row, &full_text, &theme));
+        match fold {
+            Some(f) => {
+                if let Some(pos) = self.folded.iter().position(|r| *r == f.start) {
+                    self.folded.remove(pos);
+                    self.status_message = format!("Fold expanded (line {})", f.start + 1);
+                } else {
+                    self.folded.push(f.start);
+                    self.status_message = format!("Folded {} ({} lines)", f.label, f.end - f.start);
+                }
+            }
+            None => {
+                // Cursor not on a fold start: try the nearest enclosing fold.
+                let folds = self.highlighter.as_ref()
+                    .map(|h| h.folds(&full_text, &theme)).unwrap_or_default();
+                if let Some(parent) = folds.iter().rev().find(|f| f.start <= row && row <= f.end) {
+                    self.folded.push(parent.start);
+                    self.status_message = format!("Folded {} ({} lines)", parent.label, parent.end - parent.start);
+                } else {
+                    self.status_message = "No foldable region at cursor".into();
+                }
+            }
+        }
+    }
+
     fn cycle_theme(&mut self) {
         let names = self.highlighter.as_ref().map(|h| h.theme_names()).unwrap_or_default();
         if names.is_empty() { return; }
@@ -646,6 +681,11 @@ impl Editor {
                 self.fire_hook("onSetActive", &self.active_tab.to_string());
             }
             Command::ToggleTheme => self.cycle_theme(),
+            Command::ToggleFold => self.toggle_fold(),
+            Command::UnfoldAll => {
+                self.folded.clear();
+                self.status_message = "All folds expanded".into();
+            }
             Command::ReloadPlugins => self.reload_plugins_cmd(),
             Command::ListPlugins => self.list_plugins(),
             Command::ListKeybindings => {

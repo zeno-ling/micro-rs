@@ -4,3 +4,4 @@
 /.CANCEL_SHUTDOWN
 /watchdog.log
 /watchdog.py
+/.tmp
