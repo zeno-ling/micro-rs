@@ -693,4 +693,14 @@ mod tests {
         assert_eq!(literal_char(&key(KeyCode::Char('p'), KeyModifiers::ALT)), None);
         assert_eq!(literal_char(&key(KeyCode::Enter, KeyModifiers::NONE)), None);
     }
+
+    #[test]
+    fn shift_symbol_reaches_the_buffer() {
+        let mut ed = Editor::new(vec![]);
+        ed.on_key(key(KeyCode::Char('!'), KeyModifiers::SHIFT));
+        ed.on_key(key(KeyCode::Char('@'), KeyModifiers::SHIFT));
+        ed.on_key(key(KeyCode::Char('A'), KeyModifiers::SHIFT));
+        ed.on_key(key(KeyCode::Char('a'), KeyModifiers::NONE));
+        assert_eq!(ed.pane().buf.rope.to_string(), "!@Aa");
+    }
 }
