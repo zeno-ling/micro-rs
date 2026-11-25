@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use rhai::Dynamic;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -61,6 +61,30 @@ pub struct Editor {
     /// an action name to a command; the tide/scroll behaviour is handled inline.
     mouse: Vec<(String, Command)>,
     search_opts: crate::search::SearchOptions,
+}
+
+/// The character a key event should insert literally, if any.
+///
+/// Terminals report a Shift-produced symbol as the finished character plus a
+/// SHIFT modifier (`Shift-1` arrives as `Char('!')` with SHIFT set), so SHIFT
+/// must not disqualify insertion — the character already carries its effect.
+/// Only CONTROL and ALT mark a real chord that should never be typed.
+fn literal_char(key: &KeyEvent) -> Option<char> {
+    if key.modifiers.contains(KeyModifiers::CONTROL) || key.modifiers.contains(KeyModifiers::ALT) {
+        return None;
+    }
+    match key.code {
+        KeyCode::Char(c) => Some(c),
+        _ => None,
+    }
+}
+
+/// Focus decides which mode is active, which in turn gates which bindings are
+/// live — the same mechanism as micro's ModeConstraint.
+fn sync_modes(keytree: &mut crate::keytree::KeyTree, prompt: bool, menu: bool) {
+    keytree.set_mode("prompt", prompt);
+    keytree.set_mode("menu", menu);
+    keytree.set_mode("buffer", !prompt && !menu);
 }
 
 impl Editor {
@@ -284,17 +308,20 @@ impl Editor {
 
         // Focus decides the active mode, which in turn gates which bindings are
         // live — the same mechanism as micro's ModeConstraint.
-        self.keytree.set_mode("prompt", self.prompt.is_some());
-        self.keytree.set_mode("menu", self.menu_open.is_some());
-        self.keytree.set_mode("buffer", self.prompt.is_none() && self.menu_open.is_none());
+        sync_modes(&mut self.keytree, self.prompt.is_some(), self.menu_open.is_some());
 
         if let Some(prompt) = &mut self.prompt {
             match key.code {
                 KeyCode::Esc => { self.prompt = None; self.focus = Focus::Editor; }
                 KeyCode::Enter => { let p = self.prompt.take().unwrap(); self.focus = Focus::Editor; self.run_prompt(p); }
                 KeyCode::Backspace => { prompt.input.pop(); }
-                KeyCode::Char(c) => { prompt.input.push(c); }
-                _ => {}
+                _ => {
+                    // Same rule as the buffer: SHIFT-produced symbols and
+                    // capitals are normal input, CONTROL/ALT are not.
+                    if let Some(c) = literal_char(&key) {
+                        prompt.input.push(c);
+                    }
+                }
             }
             return;
         }
@@ -318,10 +345,8 @@ impl Editor {
             crate::keytree::KeyOutcome::None => {
                 // Unbound plain character falls through to literal insertion,
                 // like micro's DoRuneInsert fallback.
-                if key.modifiers.is_empty() {
-                    if let KeyCode::Char(c) = key.code {
-                        self.execute(Command::Insert(c));
-                    }
+                if let Some(c) = literal_char(&key) {
+                    self.execute(Command::Insert(c));
                 }
             }
         }
@@ -340,7 +365,7 @@ impl Editor {
             7 => self.execute(Command::Replace),
             9 => self.cycle_theme(),
             10 => self.execute(Command::SplitVertical),
-            12 => { self.status_message = "micro-rs 0.1.2 — Rust terminal editor".into(); }
+            12 => { self.status_message = "micro-rs 0.1.3 — Rust terminal editor".into(); }
             _ => {}
         }
     }
@@ -641,5 +666,31 @@ impl Editor {
         let c = self.pane().buf.cursor;
         let p = self.pane_mut();
         if c.line < p.top { p.top = c.line; }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
+        KeyEvent::new(code, mods)
+    }
+
+    #[test]
+    fn shift_symbols_are_typed() {
+        // Terminals report Shift-1 as the finished character plus SHIFT.
+        assert_eq!(literal_char(&key(KeyCode::Char('!'), KeyModifiers::SHIFT)), Some('!'));
+        assert_eq!(literal_char(&key(KeyCode::Char('@'), KeyModifiers::SHIFT)), Some('@'));
+        // A capital letter arrives the same way.
+        assert_eq!(literal_char(&key(KeyCode::Char('A'), KeyModifiers::SHIFT)), Some('A'));
+        assert_eq!(literal_char(&key(KeyCode::Char('a'), KeyModifiers::NONE)), Some('a'));
+    }
+
+    #[test]
+    fn chords_are_not_typed() {
+        assert_eq!(literal_char(&key(KeyCode::Char('c'), KeyModifiers::CONTROL)), None);
+        assert_eq!(literal_char(&key(KeyCode::Char('p'), KeyModifiers::ALT)), None);
+        assert_eq!(literal_char(&key(KeyCode::Enter, KeyModifiers::NONE)), None);
     }
 }
