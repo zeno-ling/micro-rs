@@ -1,0 +1,21 @@
+name: Release macOS arm64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build (native arm64)
+        run: cargo build --release
+      - name: Package
+        run: bash scripts/release.sh -s -n
+      - uses: actions/upload-artifact@v4
+        with:
+          name: micro-rs-macos-arm64
+          path: target/micro-rs-*-macos-arm64.tar.gz

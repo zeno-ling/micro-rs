@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# micro-rs 一键打包发布脚本（Linux / macOS）
+# 用法：./scripts/release.sh [-v v0.1.0] [-r owner/repo] [-s] [-n] [-t target] [-a arch]
+#   -v  指定版本（默认从 Cargo.toml 读取）
+#   -r  GitHub 仓库（默认 zeno-ling/micro-rs）
+#   -s  跳过编译，用现有二进制打包
+#   -n  只打包，不上传 GitHub Release
+#   -t  Rust target triple（交叉编译，如 x86_64-apple-darwin）
+#   -a  覆盖架构名（如 x64），用于 uname 与 target 不一致时
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="zeno-ling/micro-rs"
+VERSION=""
+SKIP_BUILD=0
+NO_UPLOAD=0
+TARGET=""
+ARCH_OVERRIDE=""
+
+while getopts "v:r:st:a:n" opt; do
+    case "$opt" in
+        v) VERSION="$OPTARG" ;;
+        r) REPO="$OPTARG" ;;
+        s) SKIP_BUILD=1 ;;
+        t) TARGET="$OPTARG" ;;
+        a) ARCH_OVERRIDE="$OPTARG" ;;
+        n) NO_UPLOAD=1 ;;
+        *) echo "用法: $0 [-v 版本] [-r 仓库] [-s 跳过编译] [-n 只打包] [-t target] [-a 架构]" >&2; exit 1 ;;
+    esac
+done
+
+cd "$ROOT"
+
+# 1) 版本号（从 Cargo.toml 的 package.version 读取）
+if [[ -z "$VERSION" ]]; then
+    VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' Cargo.toml | head -n1)"
+    if [[ -z "$VERSION" ]]; then
+        echo "错误: 无法从 Cargo.toml 读取版本号，请用 -v 指定" >&2
+        exit 1
+    fi
+fi
+VER="${VERSION#v}"
+TAG="v$VER"
+
+# 2) 平台与架构
+OS_RAW="$(uname -s)"
+case "$OS_RAW" in
+    Linux)  OS="linux" ;;
+    Darwin) OS="macos" ;;
+    *)      OS="$(echo "$OS_RAW" | tr '[:upper:]' '[:lower:]')" ;;
+esac
+ARCH_RAW="$(uname -m)"
+case "$ARCH_RAW" in
+    x86_64|amd64) ARCH="x64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *) ARCH="$ARCH_RAW" ;;
+esac
+if [[ -n "$ARCH_OVERRIDE" ]]; then
+    ARCH="$ARCH_OVERRIDE"
+fi
+TAR_NAME="micro-rs-$VER-$OS-$ARCH.tar.gz"
+
+echo "== micro-rs 发布打包 $TAG ($OS-$ARCH) =="
+
+# 3) 编译
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+    echo "编译 release..."
+    if [[ -n "$TARGET" ]]; then
+        cargo build --release --target "$TARGET"
+    else
+        cargo build --release
+    fi
+fi
+
+if [[ -n "$TARGET" ]]; then
+    BIN="target/$TARGET/release/micro-rs"
+else
+    BIN="target/release/micro-rs"
+fi
+if [[ ! -f "$BIN" ]]; then
+    echo "错误: 找不到 $BIN，请先编译" >&2
+    exit 1
+fi
+
+# 4) 汇集文件
+STAGE="target/release-stage-$OS-$ARCH"
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+cp "$BIN" "$STAGE/micro-rs"
+cp README.md LICENSE "$STAGE/"
+
+# 5) 压缩
+TAR="target/$TAR_NAME"
+rm -f "$TAR"
+tar -czf "$TAR" -C "$STAGE" .
+echo "已生成 $TAR_NAME ($(du -h "$TAR" | cut -f1))"
+
+# 6) 上传 GitHub Release
+if [[ "$NO_UPLOAD" -eq 0 ]]; then
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "错误: 未安装 GitHub CLI (gh)，或加 -n 只打包" >&2
+        exit 1
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+        echo "错误: gh 未登录，请先运行 gh auth login，或加 -n" >&2
+        exit 1
+    fi
+
+    if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+        echo "Release $TAG 已存在，覆盖上传资产..."
+        gh release upload "$TAG" "$TAR" --repo "$REPO" --clobber
+    else
+        echo "创建 Release $TAG 并上传资产..."
+        NOTES="micro-rs $VER — $OS-$ARCH 绿色版，解压即用。一个用 Rust 写的终端文本编辑器，操作手感参照 micro。"
+        gh release create "$TAG" "$TAR" --repo "$REPO" \
+            --title "micro-rs $VER — $OS-$ARCH" --notes "$NOTES"
+    fi
+    echo "发布完成: https://github.com/$REPO/releases/tag/$TAG"
+else
+    echo "跳过上传 (-n)。资产位于: $TAR"
+fi

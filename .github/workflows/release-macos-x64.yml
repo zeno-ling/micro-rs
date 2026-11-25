@@ -1,0 +1,23 @@
+name: Release macOS x64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - name: Build (cross-compile x86_64)
+        run: cargo build --release --target x86_64-apple-darwin
+      - name: Package
+        run: bash scripts/release.sh -s -n -t x86_64-apple-darwin -a x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: micro-rs-macos-x64
+          path: target/micro-rs-*-macos-x64.tar.gz

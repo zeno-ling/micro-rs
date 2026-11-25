@@ -1,0 +1,5 @@
+/target
+/.micro-rs-stdin.tmp
+/.DONE
+/.CANCEL_SHUTDOWN
+/watchdog.log
