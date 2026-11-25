@@ -1,6 +1,6 @@
 [package]
 name = "micro-rs"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 description = "A modern terminal text editor written in Rust, inspired by micro"

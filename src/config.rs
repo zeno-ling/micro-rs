@@ -8,7 +8,16 @@ pub struct Config {
     pub line_numbers: bool,
     pub theme: String,
     pub tab_size: usize,
+    /// Key bindings. Keys accept multi-key chords such as
+    /// `"Ctrl-x Ctrl-s": "Save"`.
     pub keymap: std::collections::HashMap<String, String>,
+    /// Mouse bindings, e.g. `{"MouseWheelUp": "PageUp"}`.
+    #[serde(default)]
+    pub mouse: std::collections::HashMap<String, String>,
+    /// Per-plugin enable flags, keyed by script file stem. Absent means enabled,
+    /// matching official micro's `pluginview` toggles.
+    #[serde(default)]
+    pub plugins: std::collections::HashMap<String, bool>,
 }
 
 impl Default for Config {
@@ -19,11 +28,18 @@ impl Default for Config {
             theme: "base16-ocean.dark".into(),
             tab_size: 4,
             keymap: std::collections::HashMap::new(),
+            mouse: std::collections::HashMap::new(),
+            plugins: std::collections::HashMap::new(),
         }
     }
 }
 
 impl Config {
+    /// Whether the plugin script named `stem` is enabled.
+    pub fn plugin_enabled(&self, stem: &str) -> bool {
+        self.plugins.get(stem).copied().unwrap_or(true)
+    }
+
     pub fn path() -> PathBuf {
         let dir = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))

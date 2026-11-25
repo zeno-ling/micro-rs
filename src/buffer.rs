@@ -181,9 +181,6 @@ impl Buffer {
         self.cursor.col = self.line_len(self.cursor.line);
     }
 
-    pub fn move_bol(&mut self) { self.move_home(); }
-    pub fn move_eol(&mut self) { self.move_end(); }
-
     pub fn move_file_start(&mut self) { self.cursor = Cursor::default(); }
     pub fn move_file_end(&mut self) {
         self.cursor = self.char_to_cursor(self.rope.len_chars());

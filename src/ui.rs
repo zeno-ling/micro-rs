@@ -4,7 +4,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Tabs, Wrap};
 use ratatui::Frame;
 
-use crate::editor::{Editor, Focus};
+use crate::editor::Editor;
 
 pub fn draw(frame: &mut Frame, ed: &Editor) {
     let area = frame.area();
@@ -121,7 +121,7 @@ fn draw_menu(frame: &mut Frame, area: Rect, ed: &Editor) {
     } else {
         ed.menus.iter().map(|(k, _)| format!(" {k} ")).collect::<Vec<_>>().join(" | ")
     };
-    let style = if matches!(ed.focus, Focus::Menu) {
+    let style = if ed.menu_open.is_some() {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::Gray)

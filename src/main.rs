@@ -13,6 +13,7 @@ mod clipboard;
 mod commands;
 mod config;
 mod editor;
+mod keytree;
 mod plugins;
 mod search;
 mod syntax;
@@ -43,7 +44,7 @@ fn main() -> Result<()> {
 fn run(files: Vec<PathBuf>) -> Result<()> {
     enable_raw_mode()?;
     let mut out = stdout();
-    execute!(out, EnterAlternateScreen)?;
+    execute!(out, EnterAlternateScreen, crossterm::event::EnableMouseCapture)?;
     let backend = CrosstermBackend::new(out);
     let mut terminal = Terminal::new(backend)?;
 
@@ -57,7 +58,7 @@ fn run(files: Vec<PathBuf>) -> Result<()> {
     })();
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(terminal.backend_mut(), crossterm::event::DisableMouseCapture, LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     result
 }

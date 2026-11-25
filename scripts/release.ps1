@@ -1,5 +1,5 @@
 # micro-rs 一键打包发布脚本（Windows）
-# 用法：.\scripts\release.ps1 [-Version v0.1.0] [-SkipBuild] [-NoUpload] [-Repo owner/repo]
+# 用法：.\scripts\release.ps1 [-Version v0.1.2] [-SkipBuild] [-NoUpload] [-Repo owner/repo]
 
 param(
     [string]$Version = "",
@@ -93,3 +93,4 @@ try {
     }
 }
 finally { Pop-Location }
+
